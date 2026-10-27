@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+#
+# supr - Super Utility Project Runner
+#
+# version: 0.1.0
+# license: MIT
+# project: https://github.com/CodeMan99/supr
+#
+# Usage: supr <command> [...args]
+#	  Calls a user command with the given arguments.
+# Usage: supr [--list] [--path=<cmd>] [--help]
+#	  Internal options:
+#		--list			List subcommands for the current project.
+#		--path <cmd>	Resolve the path for the given command.
+#		--help			Show this help text.
+#
+# Should always be executed within a git project.
+
+# $ hash /tmp
+# cad2309
+# $ hash /tmp/world
+# 4bb7e96
+# $ hash /tmp/helloworld
+# 9acad4b
+function hash() {
+	local value="$1"
+	local blob="$(printf "%s" "$value" | git hash-object --stdin --no-filters)"
+
+	printf "%s" "${blob::7}"
+}
+
+declare common_dir="$(git rev-parse --absolute-git-dir 2> /dev/null)"
+
+if ! common_dir="$(git rev-parse --absolute-git-dir 2> /dev/null)"; then
+	printf "Error: supr must be executed inside a git repository.\n" >&2
+	exit 1
+fi
+
+declare root="${common_dir%/.git}"
+declare project_name="$(basename "$root")"
+declare project_uniq="$(hash "$root")"
+declare supr_path="${SUPR_PATH:-$HOME/.local/bin}"
+
+# Expose the project root to users
+export SUPR_PROJECT_ROOT="$root"
+
+function resolve-executable-name() {
+	local short="$2"
+
+	if [[ "$short" == "short" ]]; then
+		printf "supr-%s-%s" "$project_name" "$1"
+	else
+		printf "supr-%s-%s-%s" "$project_name" "$project_uniq" "$1"
+	fi
+}
+
+function list-commands() {
+	find "$supr_path" -maxdepth 1 -type f \( -perm -u+x -o -perm -g+x -o -perm -o+x \) -name "supr-${project_name}-*" \
+		| sed -E "s|^${supr_path}/supr-${project_name}-(${project_uniq}-)?||" \
+		| grep -E -v '^[-]+boot$' \
+		| sort
+}
+
+function execute-boot() {
+	local command="-boot"
+	local target="${supr_path}/$(resolve-executable-name "$command")"
+
+	if [[ -x "$target" ]]; then
+		"$target"
+	else
+		return 0
+	fi
+}
+
+function command-path() {
+	local command_name="$1"
+	local short="$2"
+	local filename="${supr_path}/$(resolve-executable-name "$command_name" "$short")"
+
+	printf "%s\n" "$filename"
+}
+
+function main() {
+	local -i execute=1
+	local subcommand="$1"
+	local target
+	local target_short
+	shift
+
+	if [[ -z "$subcommand" || "$subcommand" == "--help" ]]; then
+		cat <<- EOU
+		Runs personal scripts for any given project.
+
+		Must be called within a git repository.
+
+		Usage:
+
+		    supr <subcommand> [args]    Run a given script in the scope of a project
+		    supr --list                 List commands for the current project
+		    supr --path <subcommand>    Get the absolute path of the given command
+		    supr --help                 Print this help text
+
+		Current Project:                "$project_name"
+		Project Hash:                   "$project_uniq"
+		EOU
+		exit 1
+	fi
+
+	if [[ "$subcommand" == "--list" ]]; then
+		printf "Available commands for the '%s' project.\n\n" "$project_name"
+		# Intentionally not quoting this call. Commands should not have spaces in the name.
+		printf "  $ supr %s\n" $(list-commands)
+		printf "\n"
+		exit 0
+	fi
+
+	if [[ "$subcommand" == "--path" ]]; then
+		execute=0
+		subcommand="$1"
+		shift
+
+		if [[ -z "$subcommand" ]]; then
+			printf "Error: The --path option requires a subcommand argument\n"
+			exit 1
+		fi
+	fi
+
+	target="$(command-path "$subcommand")"
+
+	if [[ -x "$target" ]]; then
+		if [[ "$execute" == 1 ]]; then
+			eval "$(execute-boot)"
+			exec "$target" "$@"
+		else
+			printf "%s\n" "$target"
+			exit 0
+		fi
+	fi
+
+	target_short="$(command-path "$subcommand" "short")"
+
+	if [[ -x "$target_short" ]]; then
+		if [[ "$execute" == 1 ]]; then
+			eval "$(execute-boot)"
+			exec "$target_short" "$@"
+		else
+			printf "%s\n" "$target_short"
+			exit 0
+		fi
+	fi
+
+	if [[ "$execute" == 1 ]]; then
+		printf "Error: Subcommand '%s' not found for project '%s'.\n" "$subcommand" "$project_name"
+		printf "Looked for: %s\n" "$target"
+		printf "Looked for: %s\n" "$target_short"
+	else
+		# Always write the command path when given the `--path` option.
+		command-path "${subcommand}"
+	fi
+}
+
+main "$@"
