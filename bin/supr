@@ -40,9 +40,21 @@ declare root="${common_dir%/.git}"
 declare project_name="$(basename "$root")"
 declare project_uniq="$(hash "$root")"
 declare supr_path="${SUPR_PATH:-$HOME/.local/bin}"
+declare supr_lib_path="$SUPR_LIB_PATH"
+
+if [[ -z "$supr_lib_path" ]]; then
+	supr_lib_path="${supr_path%/bin}/lib"
+fi
+
+if [[ ! -d "$supr_lib_path" ]]; then
+	printf "WARNING: The %q directory does not exist.\n" "$supr_lib_path" >&2
+	supr_lib_path=""
+fi
 
 # Expose the project root to users
 export SUPR_PROJECT_ROOT="$root"
+export SUPR_BIN_PATH="$supr_path"
+export SUPR_LIB_PATH="$supr_lib_path"
 
 function resolve-executable-name() {
 	local short="$2"
@@ -129,6 +141,7 @@ function main() {
 
 	if [[ -x "$target" ]]; then
 		if [[ "$execute" == 1 ]]; then
+			export SUPR_COMMAND_NAME="${target##*/}"
 			eval "$(execute-boot)"
 			exec "$target" "$@"
 		else
@@ -141,6 +154,7 @@ function main() {
 
 	if [[ -x "$target_short" ]]; then
 		if [[ "$execute" == 1 ]]; then
+			export SUPR_COMMAND_NAME="${target_short##*/}"
 			eval "$(execute-boot)"
 			exec "$target_short" "$@"
 		else
