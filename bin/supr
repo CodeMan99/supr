@@ -70,7 +70,9 @@ function list-commands() {
 
 function execute-boot() {
 	local command="-boot"
-	local target="${SUPR_BIN_PATH}/$(resolve-executable-name "$command")"
+	local target
+
+	target="${SUPR_BIN_PATH}/$(resolve-executable-name "$command")"
 
 	if [[ -x "$target" ]]; then
 		"$target"
@@ -82,7 +84,9 @@ function execute-boot() {
 function command-path() {
 	local command_name="$1"
 	local short="$2"
-	local filename="${SUPR_BIN_PATH}/$(resolve-executable-name "$command_name" "$short")"
+	local filename
+
+	filename="${SUPR_BIN_PATH}/$(resolve-executable-name "$command_name" "$short")"
 
 	printf "%s\n" "$filename"
 }
