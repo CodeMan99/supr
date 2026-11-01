@@ -16,6 +16,16 @@
 #
 # Should always be executed within a git project.
 
+declare project_gitdir
+declare project_root_path
+declare project_name
+declare project_uniq
+
+if ! project_gitdir="$(git rev-parse --absolute-git-dir 2> /dev/null)"; then
+	printf "Error: supr must be executed inside a git repository.\n" >&2
+	exit 1
+fi
+
 # $ hash /tmp
 # cad2309
 # $ hash /tmp/world
@@ -24,37 +34,21 @@
 # 9acad4b
 function hash() {
 	local value="$1"
-	local blob="$(printf "%s" "$value" | git hash-object --stdin --no-filters)"
+	local blob
+
+	blob="$(printf "%s" "$value" | git hash-object --stdin --no-filters)"
 
 	printf "%s" "${blob::7}"
 }
 
-declare common_dir="$(git rev-parse --absolute-git-dir 2> /dev/null)"
+project_root_path="${project_gitdir%/.git}"
+project_name="$(basename "$project_root_path")"
+project_uniq="$(hash "$project_root_path")"
 
-if ! common_dir="$(git rev-parse --absolute-git-dir 2> /dev/null)"; then
-	printf "Error: supr must be executed inside a git repository.\n" >&2
-	exit 1
-fi
-
-declare root="${common_dir%/.git}"
-declare project_name="$(basename "$root")"
-declare project_uniq="$(hash "$root")"
-declare supr_path="${SUPR_PATH:-$HOME/.local/bin}"
-declare supr_lib_path="$SUPR_LIB_PATH"
-
-if [[ -z "$supr_lib_path" ]]; then
-	supr_lib_path="${supr_path%/bin}/lib"
-fi
-
-if [[ ! -d "$supr_lib_path" ]]; then
-	printf "WARNING: The %q directory does not exist.\n" "$supr_lib_path" >&2
-	supr_lib_path=""
-fi
-
-# Expose the project root to users
-export SUPR_PROJECT_ROOT="$root"
-export SUPR_BIN_PATH="$supr_path"
-export SUPR_LIB_PATH="$supr_lib_path"
+export SUPR_PROJECT_ROOT="$project_root_path"
+export SUPR_ROOT="${SUPR_ROOT:-$HOME/.local}"
+export SUPR_BIN_PATH="${SUPR_BIN_PATH:-$SUPR_ROOT/bin}"
+export SUPR_LIB_PATH="${SUPR_LIB_PATH:-$SUPR_ROOT/bin}"
 
 function resolve-executable-name() {
 	local short="$2"
@@ -67,15 +61,16 @@ function resolve-executable-name() {
 }
 
 function list-commands() {
-	find "$supr_path" -maxdepth 1 -type f \( -perm -u+x -o -perm -g+x -o -perm -o+x \) -name "supr-${project_name}-*" \
-		| sed -E "s|^${supr_path}/supr-${project_name}-(${project_uniq}-)?||" \
+	# Note, the `-type f` filter means that soft links will not be found!
+	find "$SUPR_BIN_PATH" -maxdepth 1 -type f \( -perm -u+x -o -perm -g+x -o -perm -o+x \) -name "supr-${project_name}-*" \
+		| sed -E "s|^${SUPR_BIN_PATH}/supr-${project_name}-(${project_uniq}-)?||" \
 		| grep -E -v '^[-]+boot$' \
 		| sort
 }
 
 function execute-boot() {
 	local command="-boot"
-	local target="${supr_path}/$(resolve-executable-name "$command")"
+	local target="${SUPR_BIN_PATH}/$(resolve-executable-name "$command")"
 
 	if [[ -x "$target" ]]; then
 		"$target"
@@ -87,7 +82,7 @@ function execute-boot() {
 function command-path() {
 	local command_name="$1"
 	local short="$2"
-	local filename="${supr_path}/$(resolve-executable-name "$command_name" "$short")"
+	local filename="${SUPR_BIN_PATH}/$(resolve-executable-name "$command_name" "$short")"
 
 	printf "%s\n" "$filename"
 }
