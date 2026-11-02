@@ -48,7 +48,7 @@ project_uniq="$(hash "$project_root_path")"
 export SUPR_PROJECT_ROOT="$project_root_path"
 export SUPR_ROOT="${SUPR_ROOT:-$HOME/.local}"
 export SUPR_BIN_PATH="${SUPR_BIN_PATH:-$SUPR_ROOT/bin}"
-export SUPR_LIB_PATH="${SUPR_LIB_PATH:-$SUPR_ROOT/bin}"
+export SUPR_LIB_PATH="${SUPR_LIB_PATH:-$SUPR_ROOT/lib}"
 
 function resolve-executable-name() {
 	local short="$2"
