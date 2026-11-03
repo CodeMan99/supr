@@ -87,3 +87,15 @@ $ supr --path -boot      # A script here will be executed before all commands
 ```
 
 This is a great place to unlock secrets.
+
+## Environment Values
+
+The configuration of `supr` and runtime values of all commands.
+
+| Env Name            | Description                                            | Default           |
+| ------------------- | ------------------------------------------------------ | ----------------- |
+| `SUPR_ROOT`         | Home directory of commands.                            | `$HOME/.local`    |
+| `SUPR_BIN_PATH`     | Location where commands can be found.                  | `$SUPR_ROOT/bin`  |
+| `SUPR_LIB_PATH`     | Location where implementations can find library files. | `$SUPR_ROOT/lib`  |
+| `SUPR_PROJECT_ROOT` | The directory that contains `$GIT_DIR`.                | Always Calculated |
+| `SUPR_COMMAND_NAME` | The fully resolved version of the current command.     | Always Calculated |
